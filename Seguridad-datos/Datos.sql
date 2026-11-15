@@ -1,4 +1,3 @@
-
 /* =====================================================================
    Ejecutar DESPUÉS de Seguridad.sql
  
@@ -121,3 +120,4 @@ SELECT metodo_pago, COUNT(*) AS pagos, SUM(monto) AS total FROM finanzas.Pagos G
 SELECT YEAR(fecha_pago) AS anio, MONTH(fecha_pago) AS mes, SUM(monto) AS ingresos
 FROM finanzas.Pagos GROUP BY YEAR(fecha_pago), MONTH(fecha_pago) ORDER BY anio, mes;
 GO
+

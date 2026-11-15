@@ -33,7 +33,6 @@ GO
                 que no debe ver dinero (entrenadores) con un solo DENY.
    auditoria -> bitácoras. Solo lectura para el administrador.
    dbo       -> queda reservado para objetos del sistema.
-   NOTA: los scripts de los demás integrantes deben usar gym.Socios, finanzas.Pagos, etc.
    --------------------------------------------------------------------- */
 USE GymDB;
 GO
@@ -232,4 +231,92 @@ FOR SERVER AUDIT Audit_GymDB
     ADD (DATABASE_PERMISSION_CHANGE_GROUP),      -- GRANT/DENY/REVOKE
     ADD (DATABASE_PRINCIPAL_CHANGE_GROUP)        -- CREATE/ALTER/DROP de usuarios y roles
 WITH (STATE = ON);
+GO
+
+/* =====================================================================
+   Ejecutar DESPUÉS de Datos.sql
+   ===================================================================== */
+USE GymDB;
+GO
+ 
+/* ---------------------------------------------------------------------
+   8. PRUEBAS DE SEGURIDAD (capturar pantalla de cada resultado como evidencia)
+   Se ejecutan con EXECUTE AS USER; los errores esperados se capturan con TRY/CATCH.
+   Estas pruebas también generan eventos en la auditoría.
+   --------------------------------------------------------------------- */
+ 
+-- 8.1 Recepción: puede leer socios y registrar pagos; NO puede borrar ni modificar pagos
+EXECUTE AS USER = N'usr_recepcion';
+    SELECT TOP (3) id_socio, nombre, apellido, correo FROM gym.Socios;
+    BEGIN TRY DELETE FROM gym.Socios WHERE id_socio = 1;
+        PRINT 'ERROR: recepcion pudo borrar'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) recepcion DELETE Socios -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN TRY UPDATE finanzas.Pagos SET monto = 1 WHERE id_pago = 1;
+        PRINT 'ERROR: recepcion pudo modificar pagos'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) recepcion UPDATE Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+REVERT;
+GO
+ 
+-- 8.2 Entrenador: ve nombre/apellido pero no correo, y no accede a finanzas
+EXECUTE AS USER = N'usr_entrenador';
+    SELECT TOP (3) id_socio, nombre, apellido FROM gym.Socios;
+    BEGIN TRY SELECT TOP (1) correo FROM gym.Socios;
+        PRINT 'ERROR: entrenador pudo leer correo'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) entrenador SELECT correo -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN TRY SELECT TOP (1) * FROM finanzas.Pagos;
+        PRINT 'ERROR: entrenador pudo leer pagos'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) entrenador SELECT Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+REVERT;
+GO
+ 
+-- 8.3 Power BI: lee pagos y socios sin datos de contacto
+EXECUTE AS USER = N'usr_powerbi';
+    SELECT TOP (3) id_socio, nombre, apellido, fecha_registro FROM gym.Socios;
+    SELECT TOP (3) * FROM finanzas.Pagos;
+    BEGIN TRY SELECT TOP (1) telefono FROM gym.Socios;
+        PRINT 'ERROR: powerbi pudo leer telefono'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) powerbi SELECT telefono -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN TRY INSERT INTO finanzas.Pagos (id_socio, monto, metodo_pago) VALUES (1, 10, 'Efectivo');
+        PRINT 'ERROR: powerbi pudo insertar'; END TRY
+    BEGIN CATCH PRINT 'OK (denegado) powerbi INSERT Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+REVERT;
+GO
+ 
+-- 8.4 Finanzas: inserta un pago de prueba y lo modifica (queda en la bitácora)
+EXECUTE AS USER = N'usr_finanzas';
+    INSERT INTO finanzas.Pagos (id_socio, monto, metodo_pago) VALUES (1, 30.00, 'Efectivo');
+    UPDATE finanzas.Pagos SET monto = 35.00 WHERE id_pago = SCOPE_IDENTITY();
+REVERT;
+GO
+ 
+/* ---------------------------------------------------------------------
+   9. CONSULTA DE EVIDENCIAS
+   --------------------------------------------------------------------- */
+-- 9.1 Usuarios y roles
+SELECT r.name AS rol, m.name AS usuario
+FROM sys.database_role_members drm
+JOIN sys.database_principals r ON r.principal_id = drm.role_principal_id
+JOIN sys.database_principals m ON m.principal_id = drm.member_principal_id
+WHERE r.name IN (N'rol_gym_admin', N'rol_recepcion', N'rol_entrenador', N'rol_finanzas', N'rol_analista_bi', N'db_backupoperator')
+ORDER BY r.name;
+ 
+-- 9.2 Matriz de permisos por rol
+SELECT pr.name AS rol, dp.state_desc AS estado, dp.permission_name AS permiso,
+       dp.class_desc AS clase,
+       CASE dp.class WHEN 3 THEN SCHEMA_NAME(dp.major_id)
+            ELSE OBJECT_SCHEMA_NAME(dp.major_id) + '.' + OBJECT_NAME(dp.major_id) END AS objeto,
+       COL_NAME(dp.major_id, dp.minor_id) AS columna
+FROM sys.database_permissions dp
+JOIN sys.database_principals pr ON pr.principal_id = dp.grantee_principal_id
+WHERE pr.name LIKE N'rol[_]%'
+ORDER BY pr.name, objeto, dp.permission_name;
+ 
+-- 9.3 Bitácora por trigger
+SELECT TOP (20) * FROM auditoria.BitacoraPagos ORDER BY id_bitacora DESC;
+ 
+-- 9.4 Lectura del archivo de SQL Server Audit
+SELECT event_time, action_id, succeeded, server_principal_name, database_principal_name,
+       schema_name, object_name, statement
+FROM sys.fn_get_audit_file(N'C:\SQLAudit\Audit_GymDB*.sqlaudit', DEFAULT, DEFAULT)
+ORDER BY event_time DESC;
 GO
