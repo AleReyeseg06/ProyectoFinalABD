@@ -3,7 +3,7 @@
    Requiere: sesión con rol sysadmin.
    Antes de ejecutar: crear la carpeta C:\SQLAudit\ y cambia la ruta en
    el script
-   En caso de ejecutar en docker dejar en /var/opt/mssql/data/ en 7.2
+   En caso de ejecutar en docker dejar en /var/opt/mssql/data/ en 7.2 y en
    ===================================================================== */
  
 /* ---------------------------------------------------------------------
