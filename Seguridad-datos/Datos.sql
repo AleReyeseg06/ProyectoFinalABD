@@ -1,11 +1,13 @@
-/* =====================================================================
+﻿/* =====================================================================
    Ejecutar DESPUÉS de Seguridad.sql
  
    Antes de ejecutar:
    1) Copiar la carpeta datos\ (6 CSV) a una ruta que el SERVICIO de SQL Server pueda leer,
       p. ej. C:\GymDB\datos\ . Si SQL Server corre en otra máquina/contenedor, la ruta es
       la de ESA máquina.
-   2) Ajustar @ruta (con "\" final) en la sección 1.
+   2) Ajustar @ruta (con separador final). En Linux preparar copias UTF-16 LE según README.
+      En Windows usar los CSV UTF-8 originales y CODEPAGE 65001.
+      No ejecutar sobre una base restaurada: elimina los datos previos.
    3) Ejecutar con un login sysadmin (BULK INSERT requiere ADMINISTER BULK OPERATIONS).
    ===================================================================== */
 USE GymDB;
@@ -15,7 +17,11 @@ SET NOCOUNT ON;
 SET XACT_ABORT ON;
 go
 
-DECLARE @ruta NVARCHAR(260) = N'/var/opt/mssql/datos/';   -- << AJUSTAR
+DECLARE @linux BIT = CASE WHEN @@VERSION LIKE N'%Linux%' THEN 1 ELSE 0 END;
+DECLARE @ruta NVARCHAR(260) = CASE WHEN @linux = 1 THEN N'/var/opt/mssql/datos_unicode/' ELSE N'C:\GymDB\datos\' END; -- ajustar
+-- Linux: copias UTF-16 LE con BOM; Windows: CSV UTF-8 originales.
+DECLARE @codificacion NVARCHAR(100) = CASE WHEN @linux = 1
+    THEN N'DATAFILETYPE = ''widechar'', ' ELSE N'CODEPAGE = ''65001'', ROWTERMINATOR = ''0x0d0a'', ' END;
  
 /* ---------------------------------------------------------------------
    1. CARGA (en una sola transacción: o entra todo o no entra nada)
@@ -57,7 +63,7 @@ BEGIN TRY
     WHILE @@FETCH_STATUS = 0
     BEGIN
         SET @sql = N'BULK INSERT ' + @tabla + N' FROM ''' + @ruta + @archivo + N''' WITH (
-                        FORMAT = ''CSV'', FIRSTROW = 2,FIELDTERMINATOR = '','', ROWTERMINATOR = ''0x0d0a'',
+                        FORMAT = ''CSV'', FIRSTROW = 2, FIELDTERMINATOR = '','', ' + @codificacion + N'
                         KEEPIDENTITY, KEEPNULLS, CHECK_CONSTRAINTS, TABLOCK);';
         EXEC sys.sp_executesql @sql;
         PRINT N'Cargado: ' + @tabla + N' <- ' + @archivo;

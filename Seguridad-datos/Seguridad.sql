@@ -1,9 +1,9 @@
-/* =====================================================================
-   Ejecutar DESPUÉS de GymBD.sql y ANTES de Datos.sql
+﻿/* =====================================================================
+   Ejecutar DESPUÉS de GymDB.sql y ANTES de Datos.sql
    Requiere: sesión con rol sysadmin.
-   Antes de ejecutar: crear la carpeta C:\SQLAudit\ y cambia la ruta en
-   el script
-   En caso de ejecutar en docker dejar en /var/opt/mssql/data/ en 7.2 y en
+   Ejecutar seccion 1 por separado y sustituir las contrasenas de ejemplo localmente.
+   En Docker usar /var/opt/mssql/data/; en Windows ajustar la ruta en 7.2.
+   La seccion 9.4 obtiene la ruta real de la auditoria activa.
    ===================================================================== */
  
 /* ---------------------------------------------------------------------
@@ -13,17 +13,53 @@ USE master;
 GO
  
 IF SUSER_ID(N'lg_gym_admin') IS NULL
-    CREATE LOGIN lg_gym_admin     WITH PASSWORD = N'Gym#Admin2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_admin NVARCHAR(128) = N'CAMBIAR_LOCAL_ADMIN';
+    IF @pw_admin LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_admin antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_admin NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_admin WITH PASSWORD = ' + QUOTENAME(@pw_admin, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_admin;
+END;
 IF SUSER_ID(N'lg_gym_recepcion') IS NULL
-    CREATE LOGIN lg_gym_recepcion WITH PASSWORD = N'Gym#Recep2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_recepcion NVARCHAR(128) = N'CAMBIAR_LOCAL_RECEPCION';
+    IF @pw_recepcion LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_recepcion antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_recepcion NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_recepcion WITH PASSWORD = ' + QUOTENAME(@pw_recepcion, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_recepcion;
+END;
 IF SUSER_ID(N'lg_gym_entrenador') IS NULL
-    CREATE LOGIN lg_gym_entrenador WITH PASSWORD = N'Gym#Entre2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_entrenador NVARCHAR(128) = N'CAMBIAR_LOCAL_ENTRENADOR';
+    IF @pw_entrenador LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_entrenador antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_entrenador NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_entrenador WITH PASSWORD = ' + QUOTENAME(@pw_entrenador, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_entrenador;
+END;
 IF SUSER_ID(N'lg_gym_finanzas') IS NULL
-    CREATE LOGIN lg_gym_finanzas  WITH PASSWORD = N'Gym#Finan2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_finanzas NVARCHAR(128) = N'CAMBIAR_LOCAL_FINANZAS';
+    IF @pw_finanzas LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_finanzas antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_finanzas NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_finanzas WITH PASSWORD = ' + QUOTENAME(@pw_finanzas, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_finanzas;
+END;
 IF SUSER_ID(N'lg_gym_powerbi') IS NULL
-    CREATE LOGIN lg_gym_powerbi   WITH PASSWORD = N'Gym#PowerBI2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_powerbi NVARCHAR(128) = N'CAMBIAR_LOCAL_POWERBI';
+    IF @pw_powerbi LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_powerbi antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_powerbi NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_powerbi WITH PASSWORD = ' + QUOTENAME(@pw_powerbi, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_powerbi;
+END;
 IF SUSER_ID(N'lg_gym_respaldos') IS NULL
-    CREATE LOGIN lg_gym_respaldos WITH PASSWORD = N'Gym#Backup2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
+BEGIN
+    DECLARE @pw_respaldos NVARCHAR(128) = N'CAMBIAR_LOCAL_RESPALDOS';
+    IF @pw_respaldos LIKE N'CAMBIAR[_]LOCAL[_]%'
+        THROW 50010, N'Configura la contrasena local de lg_gym_respaldos antes de ejecutar la seccion 1.', 1;
+    DECLARE @sql_respaldos NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_respaldos WITH PASSWORD = ' + QUOTENAME(@pw_respaldos, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
+    EXEC sys.sp_executesql @sql_respaldos;
+END;
 GO
  
 /* ---------------------------------------------------------------------
@@ -170,7 +206,7 @@ GO
  
 /* ---------------------------------------------------------------------
    7. AUDITORÍA DE SQL SERVER (SQL Server Audit)
-   Archivo de auditoría en C:\SQLAudit\ (la carpeta debe existir y el servicio de
+   Archivo de auditoría en /var/opt/mssql/data/ (ajustar para Windows; la carpeta debe existir y el servicio de
    SQL Server debe tener permiso de escritura).
    --------------------------------------------------------------------- */
 USE master;
@@ -248,12 +284,12 @@ GO
 -- 8.1 Recepción: puede leer socios y registrar pagos; NO puede borrar ni modificar pagos
 EXECUTE AS USER = N'usr_recepcion';
     SELECT TOP (3) id_socio, nombre, apellido, correo FROM gym.Socios;
-    BEGIN TRY DELETE FROM gym.Socios WHERE id_socio = 1;
+    BEGIN TRY DELETE FROM gym.Socios WHERE 1 = 0;
         PRINT 'ERROR: recepcion pudo borrar'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) recepcion DELETE Socios -> ' + ERROR_MESSAGE(); END CATCH;
-    BEGIN TRY UPDATE finanzas.Pagos SET monto = 1 WHERE id_pago = 1;
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) recepcion DELETE Socios -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN TRY UPDATE finanzas.Pagos SET monto = 1 WHERE 1 = 0;
         PRINT 'ERROR: recepcion pudo modificar pagos'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) recepcion UPDATE Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) recepcion UPDATE Pagos -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
 REVERT;
 GO
  
@@ -262,10 +298,10 @@ EXECUTE AS USER = N'usr_entrenador';
     SELECT TOP (3) id_socio, nombre, apellido FROM gym.Socios;
     BEGIN TRY SELECT TOP (1) correo FROM gym.Socios;
         PRINT 'ERROR: entrenador pudo leer correo'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) entrenador SELECT correo -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) entrenador SELECT correo -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
     BEGIN TRY SELECT TOP (1) * FROM finanzas.Pagos;
         PRINT 'ERROR: entrenador pudo leer pagos'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) entrenador SELECT Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) entrenador SELECT Pagos -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
 REVERT;
 GO
  
@@ -275,18 +311,20 @@ EXECUTE AS USER = N'usr_powerbi';
     SELECT TOP (3) * FROM finanzas.Pagos;
     BEGIN TRY SELECT TOP (1) telefono FROM gym.Socios;
         PRINT 'ERROR: powerbi pudo leer telefono'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) powerbi SELECT telefono -> ' + ERROR_MESSAGE(); END CATCH;
-    BEGIN TRY INSERT INTO finanzas.Pagos (id_socio, monto, metodo_pago) VALUES (1, 10, 'Efectivo');
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) powerbi SELECT telefono -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN TRY INSERT INTO finanzas.Pagos (id_socio, monto, metodo_pago) SELECT 1, 10, 'Efectivo' WHERE 1 = 0;
         PRINT 'ERROR: powerbi pudo insertar'; END TRY
-    BEGIN CATCH PRINT 'OK (denegado) powerbi INSERT Pagos -> ' + ERROR_MESSAGE(); END CATCH;
+    BEGIN CATCH IF ERROR_NUMBER() = 229 PRINT 'OK (denegado) powerbi INSERT Pagos -> ' + ERROR_MESSAGE(); ELSE PRINT 'REVISAR: error distinto de permiso -> ' + ERROR_MESSAGE(); END CATCH;
 REVERT;
 GO
  
--- 8.4 Finanzas: inserta un pago de prueba y lo modifica (queda en la bitácora)
+/* 8.4 Finanzas: prueba opcional en una copia; inserta un pago y modifica el total.
+   Descomentar solo si se autoriza modificar los datos de prueba.
 EXECUTE AS USER = N'usr_finanzas';
     INSERT INTO finanzas.Pagos (id_socio, monto, metodo_pago) VALUES (1, 30.00, 'Efectivo');
     UPDATE finanzas.Pagos SET monto = 35.00 WHERE id_pago = SCOPE_IDENTITY();
 REVERT;
+*/
 GO
  
 /* ---------------------------------------------------------------------
@@ -315,8 +353,19 @@ ORDER BY pr.name, objeto, dp.permission_name;
 SELECT TOP (20) * FROM auditoria.BitacoraPagos ORDER BY id_bitacora DESC;
  
 -- 9.4 Lectura del archivo de SQL Server Audit
-SELECT event_time, action_id, succeeded, server_principal_name, database_principal_name,
-       schema_name, object_name, statement
-FROM sys.fn_get_audit_file(N'C:\SQLAudit\Audit_GymDB*.sqlaudit', DEFAULT, DEFAULT)
-ORDER BY event_time DESC;
+DECLARE @ruta_audit NVARCHAR(260);
+SELECT @ruta_audit = audit_file_path FROM sys.dm_server_audit_status
+WHERE name = N'Audit_GymDB';
+IF @ruta_audit IS NULL OR @ruta_audit = N''
+    PRINT N'Auditoria sin archivo activo: revisar configuracion y estado.';
+ELSE
+    SELECT TOP (100) event_time, action_id, succeeded, server_principal_name, database_principal_name,
+           schema_name, object_name, statement
+    FROM sys.fn_get_audit_file(@ruta_audit, DEFAULT, DEFAULT)
+    ORDER BY event_time DESC;
+GO
+-- Evidencia adicional de estado de las especificaciones.
+SELECT name, is_state_enabled FROM sys.server_audits WHERE name = N'Audit_GymDB';
+SELECT name, is_state_enabled FROM sys.server_audit_specifications WHERE name = N'SrvAuditSpec_GymDB';
+SELECT name, is_state_enabled FROM sys.database_audit_specifications WHERE name = N'DbAuditSpec_GymDB';
 GO
