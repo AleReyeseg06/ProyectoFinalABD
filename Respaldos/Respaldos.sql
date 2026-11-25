@@ -349,8 +349,8 @@ BEGIN
                          opciones NVARCHAR(100), sentencia NVARCHAR(60),
                          freq_type INT, freq_interval INT, subday_type INT, subday_interval INT, hora INT, programa SYSNAME);
     INSERT INTO @jobs VALUES
-      (N'GymDB - Respaldo FULL semanal',       N'FULL', N'.bak', N'INIT, COMPRESSION, CHECKSUM',               N'BACKUP DATABASE GymDB', 8,   1, 0,  0, 020000, N'GymDB - Domingo 02:00'),
-      (N'GymDB - Respaldo DIFERENCIAL diario', N'DIFF', N'.bak', N'DIFFERENTIAL, INIT, COMPRESSION, CHECKSUM', N'BACKUP DATABASE GymDB', 8, 126, 0,  0, 020000, N'GymDB - Lunes a sabado 02:00'),
+      (N'GymDB - Respaldo FULL semanal',       N'FULL', N'.bak', N'INIT, COMPRESSION, CHECKSUM',               N'BACKUP DATABASE GymDB', 8,   1, 1,  0, 020000, N'GymDB - Domingo 02:00'),
+      (N'GymDB - Respaldo DIFERENCIAL diario', N'DIFF', N'.bak', N'DIFFERENTIAL, INIT, COMPRESSION, CHECKSUM', N'BACKUP DATABASE GymDB', 8, 126, 1,  0, 020000, N'GymDB - Lunes a sabado 02:00'),
       (N'GymDB - Respaldo LOG cada 30 min',    N'LOG',  N'.trn', N'INIT, COMPRESSION, CHECKSUM',               N'BACKUP LOG GymDB',      4,   1, 4, 30, 000000, N'GymDB - Cada 30 minutos');
 
     DECLARE @nombre SYSNAME, @corto NVARCHAR(10), @ext NVARCHAR(5), @op NVARCHAR(100), @sent NVARCHAR(60),

@@ -1,65 +1,26 @@
-﻿/* =====================================================================
-   Ejecutar DESPUÉS de GymDB.sql y ANTES de Datos.sql
-   Requiere: sesión con rol sysadmin.
-   Ejecutar seccion 1 por separado y sustituir las contrasenas de ejemplo localmente.
-   En Docker usar /var/opt/mssql/data/; en Windows ajustar la ruta en 7.2.
-   La seccion 9.4 obtiene la ruta real de la auditoria activa.
-   ===================================================================== */
- 
+﻿/* Ejecutar completo como sa en SQL Server Docker, despues de restaurar GymDB
+   o de crear las tablas. Credenciales fijas de laboratorio, no para produccion.
+   Recrea las auditorias GymDB; usar solo en instancia dedicada al proyecto. */
+
 /* ---------------------------------------------------------------------
    1. LOGINS
    --------------------------------------------------------------------- */
 USE master;
 GO
  
+-- Credenciales originales de DEMOSTRACION: solo instancia local aislada.
 IF SUSER_ID(N'lg_gym_admin') IS NULL
-BEGIN
-    DECLARE @pw_admin NVARCHAR(128) = N'CAMBIAR_LOCAL_ADMIN';
-    IF @pw_admin LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_admin antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_admin NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_admin WITH PASSWORD = ' + QUOTENAME(@pw_admin, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_admin;
-END;
+    CREATE LOGIN lg_gym_admin     WITH PASSWORD = N'Gym#Admin2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 IF SUSER_ID(N'lg_gym_recepcion') IS NULL
-BEGIN
-    DECLARE @pw_recepcion NVARCHAR(128) = N'CAMBIAR_LOCAL_RECEPCION';
-    IF @pw_recepcion LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_recepcion antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_recepcion NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_recepcion WITH PASSWORD = ' + QUOTENAME(@pw_recepcion, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_recepcion;
-END;
+    CREATE LOGIN lg_gym_recepcion WITH PASSWORD = N'Gym#Recep2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 IF SUSER_ID(N'lg_gym_entrenador') IS NULL
-BEGIN
-    DECLARE @pw_entrenador NVARCHAR(128) = N'CAMBIAR_LOCAL_ENTRENADOR';
-    IF @pw_entrenador LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_entrenador antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_entrenador NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_entrenador WITH PASSWORD = ' + QUOTENAME(@pw_entrenador, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_entrenador;
-END;
+    CREATE LOGIN lg_gym_entrenador WITH PASSWORD = N'Gym#Entre2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 IF SUSER_ID(N'lg_gym_finanzas') IS NULL
-BEGIN
-    DECLARE @pw_finanzas NVARCHAR(128) = N'CAMBIAR_LOCAL_FINANZAS';
-    IF @pw_finanzas LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_finanzas antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_finanzas NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_finanzas WITH PASSWORD = ' + QUOTENAME(@pw_finanzas, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_finanzas;
-END;
+    CREATE LOGIN lg_gym_finanzas  WITH PASSWORD = N'Gym#Finan2026!',  DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 IF SUSER_ID(N'lg_gym_powerbi') IS NULL
-BEGIN
-    DECLARE @pw_powerbi NVARCHAR(128) = N'CAMBIAR_LOCAL_POWERBI';
-    IF @pw_powerbi LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_powerbi antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_powerbi NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_powerbi WITH PASSWORD = ' + QUOTENAME(@pw_powerbi, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_powerbi;
-END;
+    CREATE LOGIN lg_gym_powerbi   WITH PASSWORD = N'Gym#PowerBI2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 IF SUSER_ID(N'lg_gym_respaldos') IS NULL
-BEGIN
-    DECLARE @pw_respaldos NVARCHAR(128) = N'CAMBIAR_LOCAL_RESPALDOS';
-    IF @pw_respaldos LIKE N'CAMBIAR[_]LOCAL[_]%'
-        THROW 50010, N'Configura la contrasena local de lg_gym_respaldos antes de ejecutar la seccion 1.', 1;
-    DECLARE @sql_respaldos NVARCHAR(MAX) = N'CREATE LOGIN lg_gym_respaldos WITH PASSWORD = ' + QUOTENAME(@pw_respaldos, N'''' ) + N', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;';
-    EXEC sys.sp_executesql @sql_respaldos;
-END;
+    CREATE LOGIN lg_gym_respaldos WITH PASSWORD = N'Gym#Backup2026!', DEFAULT_DATABASE = GymDB, CHECK_EXPIRATION = OFF, CHECK_POLICY = ON;
 GO
  
 /* ---------------------------------------------------------------------
@@ -98,11 +59,23 @@ GO
    3. USUARIOS DE BASE DE DATOS
    --------------------------------------------------------------------- */
 IF USER_ID(N'usr_admin')     IS NULL CREATE USER usr_admin     FOR LOGIN lg_gym_admin     WITH DEFAULT_SCHEMA = gym;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_admin' AND sid <> SUSER_SID(N'lg_gym_admin'))
+    ALTER USER usr_admin WITH LOGIN = lg_gym_admin;
 IF USER_ID(N'usr_recepcion') IS NULL CREATE USER usr_recepcion FOR LOGIN lg_gym_recepcion WITH DEFAULT_SCHEMA = gym;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_recepcion' AND sid <> SUSER_SID(N'lg_gym_recepcion'))
+    ALTER USER usr_recepcion WITH LOGIN = lg_gym_recepcion;
 IF USER_ID(N'usr_entrenador') IS NULL CREATE USER usr_entrenador FOR LOGIN lg_gym_entrenador WITH DEFAULT_SCHEMA = gym;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_entrenador' AND sid <> SUSER_SID(N'lg_gym_entrenador'))
+    ALTER USER usr_entrenador WITH LOGIN = lg_gym_entrenador;
 IF USER_ID(N'usr_finanzas')  IS NULL CREATE USER usr_finanzas  FOR LOGIN lg_gym_finanzas  WITH DEFAULT_SCHEMA = finanzas;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_finanzas' AND sid <> SUSER_SID(N'lg_gym_finanzas'))
+    ALTER USER usr_finanzas WITH LOGIN = lg_gym_finanzas;
 IF USER_ID(N'usr_powerbi')   IS NULL CREATE USER usr_powerbi   FOR LOGIN lg_gym_powerbi   WITH DEFAULT_SCHEMA = gym;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_powerbi' AND sid <> SUSER_SID(N'lg_gym_powerbi'))
+    ALTER USER usr_powerbi WITH LOGIN = lg_gym_powerbi;
 IF USER_ID(N'usr_respaldos') IS NULL CREATE USER usr_respaldos FOR LOGIN lg_gym_respaldos WITH DEFAULT_SCHEMA = gym;
+ELSE IF EXISTS (SELECT 1 FROM sys.database_principals WHERE name=N'usr_respaldos' AND sid <> SUSER_SID(N'lg_gym_respaldos'))
+    ALTER USER usr_respaldos WITH LOGIN = lg_gym_respaldos;
 GO
  
 /* ---------------------------------------------------------------------
@@ -161,12 +134,18 @@ DENY  SELECT ON SCHEMA::auditoria TO rol_analista_bi;
 -- (se asigna abajo con ALTER ROLE db_backupoperator)
  
 -- Asignación de usuarios a roles
-ALTER ROLE rol_gym_admin     ADD MEMBER usr_admin;
-ALTER ROLE rol_recepcion     ADD MEMBER usr_recepcion;
-ALTER ROLE rol_entrenador    ADD MEMBER usr_entrenador;
-ALTER ROLE rol_finanzas      ADD MEMBER usr_finanzas;
-ALTER ROLE rol_analista_bi   ADD MEMBER usr_powerbi;
-ALTER ROLE db_backupoperator ADD MEMBER usr_respaldos;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'rol_gym_admin') AND member_principal_id = USER_ID(N'usr_admin'))
+    ALTER ROLE rol_gym_admin ADD MEMBER usr_admin;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'rol_recepcion') AND member_principal_id = USER_ID(N'usr_recepcion'))
+    ALTER ROLE rol_recepcion ADD MEMBER usr_recepcion;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'rol_entrenador') AND member_principal_id = USER_ID(N'usr_entrenador'))
+    ALTER ROLE rol_entrenador ADD MEMBER usr_entrenador;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'rol_finanzas') AND member_principal_id = USER_ID(N'usr_finanzas'))
+    ALTER ROLE rol_finanzas ADD MEMBER usr_finanzas;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'rol_analista_bi') AND member_principal_id = USER_ID(N'usr_powerbi'))
+    ALTER ROLE rol_analista_bi ADD MEMBER usr_powerbi;
+IF NOT EXISTS (SELECT 1 FROM sys.database_role_members WHERE role_principal_id = DATABASE_PRINCIPAL_ID(N'db_backupoperator') AND member_principal_id = USER_ID(N'usr_respaldos'))
+    ALTER ROLE db_backupoperator ADD MEMBER usr_respaldos;
 GO
  
 /* ---------------------------------------------------------------------
