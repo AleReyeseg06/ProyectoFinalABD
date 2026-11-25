@@ -1,3 +1,12 @@
+﻿/* ESTRATEGIA DE RECUPERACION
+   RPO objetivo: 30 minutos, condicionado a respaldos LOG exitosos y disponibles.
+   RTO objetivo: 1 hora (propuesto; medir durante una restauracion real).
+   FULL domingo 02:00; DIFF lunes a sabado 02:00; LOG cada 30 minutos.
+   Horarios segun el reloj del servidor. Conservar la cadena de respaldos y copias externas.
+   El archivo final COPY_ONLY no sustituye la base diferencial de un FULL normal.
+   ADVERTENCIA: secciones 3 y 5 recrean objetos de prueba y GymDB_Test;
+   ejecutar por bloques en una instancia dedicada, no sobre una copia que deba conservarse.
+*/
 /* ---------------------------------------------------------------------
    1. CONFIGURACIÓN
    --------------------------------------------------------------------- */
@@ -12,7 +21,7 @@ GO
 IF OBJECT_ID(N'tempdb..#cfg') IS NOT NULL DROP TABLE #cfg;
 CREATE TABLE #cfg (ruta NVARCHAR(260) NOT NULL);
 INSERT INTO #cfg (ruta)
-VALUES (CASE WHEN @@VERSION LIKE N'%Linux%' THEN N'/var/opt/mssql/backup/'   -- << AJUSTAR si se desea otra ruta
+VALUES (CASE WHEN @@VERSION LIKE N'%Linux%' THEN N'/var/opt/mssql/data/'   -- << AJUSTAR si se desea otra ruta
              ELSE N'C:\Backups\GymDB\' END);
 SELECT ruta AS ruta_de_respaldos FROM #cfg;
 GO
@@ -77,7 +86,7 @@ ORDER BY total_mb DESC;
 GO
 
 -- 2.3 Proyección del crecimiento a 0, 1, 3 y 5 años
---   Supuestos (tomados de los CSV de Datos.sql, ver Documentacion.md):
+--   Supuestos de planificacion del equipo (no tasas historicas verificadas):
 --     socios +275/año | horarios +1,040/año | reservas +17,900/año
 --     pagos = 9 por socio por año (se acumulan; crecen con los socios) | bitácora = 1 fila por pago nuevo
 --   bytes_fila = tamaño promedio de la fila + sus índices (incluye los de Consultas.sql) con páginas al 90 %.
@@ -145,7 +154,7 @@ WITH INIT, FORMAT, COMPRESSION, CHECKSUM, STATS = 10,
 RESTORE VERIFYONLY FROM DISK = @f WITH CHECKSUM;
 GO
 
-INSERT INTO dbo.PruebaRespaldo (etapa) VALUES ('2 - despues del FULL (entra en el DIFERENCIAL)');
+INSERT INTO dbo.PruebaRespaldo (etapa) VALUES ('2 - despues del FULL (DIFF)');
 GO
 
 -- 3.2 RESPALDO DIFERENCIAL
@@ -156,7 +165,7 @@ WITH DIFFERENTIAL, INIT, FORMAT, COMPRESSION, CHECKSUM, STATS = 10,
 RESTORE VERIFYONLY FROM DISK = @f WITH CHECKSUM;
 GO
 
-INSERT INTO dbo.PruebaRespaldo (etapa) VALUES ('3 - despues del DIFERENCIAL (entra en el LOG)');
+INSERT INTO dbo.PruebaRespaldo (etapa) VALUES ('3 - despues del DIFF (LOG)');
 GO
 
 -- 3.3 RESPALDO DEL LOG DE TRANSACCIONES
@@ -376,4 +385,9 @@ GO
 
 -- Evidencia: jobs creados
 SELECT name, enabled FROM msdb.dbo.sysjobs WHERE name LIKE N'GymDB%';
+GO
+-- Evidencia: ejecuciones finalizadas de los jobs (run_status = 1: exito).
+SELECT j.name AS job, h.run_date, h.run_time, h.run_duration, h.run_status, h.message
+FROM msdb.dbo.sysjobhistory h JOIN msdb.dbo.sysjobs j ON j.job_id = h.job_id
+WHERE j.name LIKE N'GymDB%' AND h.step_id = 0 ORDER BY h.instance_id DESC;
 GO

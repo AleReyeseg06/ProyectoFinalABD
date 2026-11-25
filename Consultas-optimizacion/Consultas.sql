@@ -1,4 +1,4 @@
-USE GymDB;
+﻿USE GymDB;
 GO
 
 SET STATISTICS IO ON;
@@ -90,36 +90,55 @@ ORDER BY total DESC;
 GO
 
 
---Indices
+-- Indices: se pueden ejecutar nuevamente sin duplicarlos.
+-- Para comparar rendimiento, ejecutar las consultas 3, 4 y 5 antes y despues
+-- de crear indices, con STATISTICS IO/TIME y plan real (Ctrl+M).
 
 -- Consultas 1, 4 y 6: buscar reservas por horario y por estado
-CREATE NONCLUSTERED INDEX IX_Reservas_Horario_Estado
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'gym.Reservas') AND name = N'IX_Reservas_Horario_Estado')
+    CREATE NONCLUSTERED INDEX IX_Reservas_Horario_Estado
     ON gym.Reservas (id_horario, estado);
 
-CREATE NONCLUSTERED INDEX IX_Reservas_Estado_Horario
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'gym.Reservas') AND name = N'IX_Reservas_Estado_Horario')
+    CREATE NONCLUSTERED INDEX IX_Reservas_Estado_Horario
     ON gym.Reservas (estado, id_horario);
 
 -- Consultas 1 y 4: joins de Horarios hacia Clases y Entrenadores (claves foraneas)
-CREATE NONCLUSTERED INDEX IX_Horarios_Clase
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'gym.Horarios') AND name = N'IX_Horarios_Clase')
+    CREATE NONCLUSTERED INDEX IX_Horarios_Clase
     ON gym.Horarios (id_clase) INCLUDE (id_entrenador, fecha, hora_inicio, cupo_maximo);
 
-CREATE NONCLUSTERED INDEX IX_Horarios_Entrenador
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'gym.Horarios') AND name = N'IX_Horarios_Entrenador')
+    CREATE NONCLUSTERED INDEX IX_Horarios_Entrenador
     ON gym.Horarios (id_entrenador) INCLUDE (id_clase, fecha, hora_inicio, cupo_maximo);
 
 -- Consultas 2 y 3: pagos agrupados / ordenados por socio y fecha
-CREATE NONCLUSTERED INDEX IX_Pagos_Socio_Fecha
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'finanzas.Pagos') AND name = N'IX_Pagos_Socio_Fecha')
+    CREATE NONCLUSTERED INDEX IX_Pagos_Socio_Fecha
     ON finanzas.Pagos (id_socio, fecha_pago DESC) INCLUDE (monto, metodo_pago);
 
 -- Consulta 5: ingresos agrupados por fecha
-CREATE NONCLUSTERED INDEX IX_Pagos_Fecha
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'finanzas.Pagos') AND name = N'IX_Pagos_Fecha')
+    CREATE NONCLUSTERED INDEX IX_Pagos_Fecha
     ON finanzas.Pagos (fecha_pago) INCLUDE (monto);
 GO
 
---Borrar indices para repetir las pruebas
+/* OPCIONAL: eliminar indices solo en una copia de pruebas para medir la linea base.
+   No ejecutar en la base final.
 DROP INDEX IF EXISTS IX_Reservas_Horario_Estado ON gym.Reservas;
 DROP INDEX IF EXISTS IX_Reservas_Estado_Horario ON gym.Reservas;
 DROP INDEX IF EXISTS IX_Horarios_Clase          ON gym.Horarios;
 DROP INDEX IF EXISTS IX_Horarios_Entrenador     ON gym.Horarios;
 DROP INDEX IF EXISTS IX_Pagos_Socio_Fecha       ON finanzas.Pagos;
 DROP INDEX IF EXISTS IX_Pagos_Fecha             ON finanzas.Pagos;
+*/
+GO
+
+-- Evidencia: indices presentes tras la ejecucion.
+SELECT SCHEMA_NAME(t.schema_id) AS esquema, t.name AS tabla, i.name AS indice, i.type_desc
+FROM sys.indexes i JOIN sys.tables t ON t.object_id = i.object_id
+WHERE i.name LIKE N'IX[_]%' ORDER BY esquema, tabla, indice;
+GO
+SET STATISTICS IO OFF;
+SET STATISTICS TIME OFF;
 GO
